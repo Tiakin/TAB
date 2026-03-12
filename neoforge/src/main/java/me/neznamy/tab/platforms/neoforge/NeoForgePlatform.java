@@ -1,11 +1,6 @@
 package me.neznamy.tab.platforms.neoforge;
 
-import com.google.common.collect.ImmutableMultimap;
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.properties.Property;
-import com.mojang.authlib.properties.PropertyMap;
 import com.mojang.logging.LogUtils;
-import lombok.NonNull;
 import me.neznamy.tab.shared.ProjectVariables;
 import me.neznamy.tab.shared.TAB;
 import me.neznamy.tab.shared.backend.BackendPlatform;
@@ -14,9 +9,7 @@ import me.neznamy.tab.shared.chat.component.TabComponent;
 import me.neznamy.tab.shared.chat.component.TabKeybindComponent;
 import me.neznamy.tab.shared.chat.component.TabTextComponent;
 import me.neznamy.tab.shared.chat.component.TabTranslatableComponent;
-import me.neznamy.tab.shared.chat.component.object.TabAtlasSprite;
 import me.neznamy.tab.shared.chat.component.object.TabObjectComponent;
-import me.neznamy.tab.shared.chat.component.object.TabPlayerSprite;
 import me.neznamy.tab.shared.features.PerWorldPlayerListConfiguration;
 import me.neznamy.tab.shared.features.injection.PipelineInjector;
 import me.neznamy.tab.shared.features.types.TabFeature;
@@ -27,12 +20,9 @@ import me.neznamy.tab.shared.platform.TabPlayer;
 import net.minecraft.SharedConstants;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.*;
-import net.minecraft.network.chat.contents.objects.AtlasSprite;
-import net.minecraft.network.chat.contents.objects.PlayerSprite;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.component.ResolvableProfile;
 import net.neoforged.fml.loading.FMLPaths;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -49,9 +39,6 @@ import java.util.function.BiConsumer;
  * @param server Minecraft server reference
  */
 public record NeoForgePlatform(MinecraftServer server) implements BackendPlatform {
-
-    /** Empty UUID */
-    private static final UUID NIL_UUID = new UUID(0, 0);
 
     @Override
     public void registerUnknownPlaceholder(@NotNull String identifier) {
@@ -95,7 +82,7 @@ public record NeoForgePlatform(MinecraftServer server) implements BackendPlatfor
     @Override
     @NotNull
     public String getServerVersionInfo() {
-        return "[NeoForge] " + SharedConstants.getCurrentVersion().name();
+        return "[NeoForge] " + SharedConstants.getCurrentVersion().getName();
     }
 
     @Override
@@ -127,11 +114,7 @@ public record NeoForgePlatform(MinecraftServer server) implements BackendPlatfor
             case TabTextComponent text -> Component.literal(text.getText());
             case TabTranslatableComponent translatable -> Component.translatable(translatable.getKey());
             case TabKeybindComponent keybind -> Component.keybind(keybind.getKeybind());
-            case TabObjectComponent object -> switch(object.getContents()) {
-                case TabAtlasSprite sprite -> Component.object(new AtlasSprite(Identifier.parse(sprite.getAtlas()), Identifier.parse(sprite.getSprite())));
-                case TabPlayerSprite sprite -> Component.object(new PlayerSprite(spriteToProfile(sprite), sprite.isShowHat()));
-                default -> throw new IllegalStateException("Unexpected object component type: " + object.getContents().getClass().getName());
-            };
+            case TabObjectComponent ignored -> Component.literal(TabObjectComponent.ERROR_MESSAGE);
             default -> throw new IllegalStateException("Unexpected component type: " + component.getClass().getName());
         };
 
@@ -144,8 +127,7 @@ public record NeoForgePlatform(MinecraftServer server) implements BackendPlatfor
                 .withUnderlined(modifier.getUnderlined())
                 .withStrikethrough(modifier.getStrikethrough())
                 .withObfuscated(modifier.getObfuscated())
-                .withFont(modifier.getFont() == null ? null : new FontDescription.Resource(Identifier.parse(modifier.getFont())));
-        if (modifier.getShadowColor() != null) style = style.withShadowColor(modifier.getShadowColor());
+                .withFont(modifier.getFont() == null ? null : ResourceLocation.tryParse(modifier.getFont()));
         nmsComponent.setStyle(style);
 
         // Extra
@@ -154,21 +136,6 @@ public record NeoForgePlatform(MinecraftServer server) implements BackendPlatfor
         }
 
         return nmsComponent;
-    }
-
-    @NotNull
-    private ResolvableProfile spriteToProfile(@NonNull TabPlayerSprite sprite) {
-        if (sprite.getId() != null) {
-            return ResolvableProfile.createUnresolved(sprite.getId());
-        } else if (sprite.getName() != null) {
-            return ResolvableProfile.createUnresolved(sprite.getName());
-        } else if (sprite.getSkin() != null) {
-            ImmutableMultimap.Builder<String, Property> builder = ImmutableMultimap.builder();
-            builder.put(TabList.TEXTURES_PROPERTY, new Property(TabList.TEXTURES_PROPERTY, sprite.getSkin().getValue(), sprite.getSkin().getSignature()));
-            return ResolvableProfile.createResolved(new GameProfile(NIL_UUID, "", new PropertyMap(builder.build())));
-        } else {
-            throw new IllegalStateException("Player head component does not have id, name or skin set");
-        }
     }
 
     @Override

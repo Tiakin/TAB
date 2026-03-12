@@ -33,9 +33,6 @@ public class NeoForgeTabList extends TrackedTabList<NeoForgeTabPlayer> {
     private static final EnumSet<ClientboundPlayerInfoUpdatePacket.Action> updateLatency = EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_LATENCY);
     private static final EnumSet<ClientboundPlayerInfoUpdatePacket.Action> updateGameMode = EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE);
     private static final EnumSet<ClientboundPlayerInfoUpdatePacket.Action> updateListed = EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_LISTED);
-    private static final EnumSet<ClientboundPlayerInfoUpdatePacket.Action> updateListOrder = EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_LIST_ORDER);
-    private static final EnumSet<ClientboundPlayerInfoUpdatePacket.Action> updateHat = EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_HAT);
-
     private static final Field entries = ReflectionUtils.getOnlyField(ClientboundPlayerInfoUpdatePacket.class, List.class);
     
     /**
@@ -75,12 +72,12 @@ public class NeoForgeTabList extends TrackedTabList<NeoForgeTabPlayer> {
 
     @Override
     public void updateListOrder(@NonNull UUID entry, int listOrder) {
-        sendPacket(updateListOrder, entry, "", null, false, 0, 0, null, listOrder, false);
+        // Not supported in 1.21.1
     }
 
     @Override
     public void updateHat(@NonNull UUID entry, boolean showHat) {
-        sendPacket(updateHat, entry, "", null, false, 0, 0, null, 0, showHat);
+        // Not supported in 1.21.1
     }
 
     @Override
@@ -97,7 +94,7 @@ public class NeoForgeTabList extends TrackedTabList<NeoForgeTabPlayer> {
     @Override
     @Nullable
     public Skin getSkin() {
-        Collection<Property> properties = player.getPlayer().getGameProfile().properties().get(TEXTURES_PROPERTY);
+        Collection<Property> properties = player.getPlayer().getGameProfile().getProperties().get(TEXTURES_PROPERTY);
         if (properties.isEmpty()) return null; // Offline mode
         Property property = properties.iterator().next();
         return new Skin(property.value(), property.signature());
@@ -149,11 +146,11 @@ public class NeoForgeTabList extends TrackedTabList<NeoForgeTabPlayer> {
                     }
                 }
                 if (actions.contains(ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER)) {
-                    TAB.getInstance().getFeatureManager().onEntryAdd(player, nmsData.profileId(), nmsData.profile().name());
+                    TAB.getInstance().getFeatureManager().onEntryAdd(player, nmsData.profileId(), nmsData.profile().getName());
                 }
                 updatedList.add(rewriteEntry ? new ClientboundPlayerInfoUpdatePacket.Entry(
                         nmsData.profileId(), nmsData.profile(), listed, latency, GameType.byId(gameMode), displayName,
-                        nmsData.showHat(), nmsData.listOrder(), nmsData.chatSession()
+                        nmsData.chatSession()
                 ) : nmsData);
             }
             if (rewritePacket) {
@@ -176,8 +173,6 @@ public class NeoForgeTabList extends TrackedTabList<NeoForgeTabPlayer> {
                 latency,
                 GameType.byId(gameMode),
                 displayName == null ? null : displayName.convert(),
-                showHat,
-                listOrder,
                 null
         )));
         sendPacket(packet);
@@ -201,7 +196,9 @@ public class NeoForgeTabList extends TrackedTabList<NeoForgeTabPlayer> {
             builder.put(TabList.TEXTURES_PROPERTY,
                     new Property(TabList.TEXTURES_PROPERTY, skin.getValue(), skin.getSignature()));
         }
-        return new GameProfile(id, name, new PropertyMap(builder.build()));
+        GameProfile profile = new GameProfile(id, name);
+        profile.getProperties().putAll(builder.build());
+        return profile;
     }
 
     /**
